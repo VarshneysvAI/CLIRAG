@@ -28,6 +28,7 @@ setup(
     entry_points={
         "console_scripts": [
             "clirag=clirag.main:app",
+            "CLIRAG=clirag.main:app",
         ],
     },
     classifiers=[

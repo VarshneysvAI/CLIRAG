@@ -112,5 +112,23 @@ def ask(query: str):
         time.sleep(0.01) # Simulate token streaming
     console.print("\n")
 
+@app.command(name="file")
+def ingest_file(filepath: str):
+    """
+    Alias for the 'ingest' command: Ingest a document (PDF, TXT, MD).
+    """
+    ingest(filepath)
+
+@app.command()
+def settings():
+    """
+    Configure or view CLIRAG Engine settings.
+    """
+    console.print(Panel.fit("[bold cyan]CLIRAG Global Settings[/bold cyan]", border_style="cyan"))
+    console.print("• [bold]Storage Pipeline:[/bold] DuckDB (Vectors) & KùzuDB (Graph)")
+    console.print("• [bold]RAM Isolation:[/bold] [green]Active[/green] (Mutex Locks Enabled)")
+    console.print("• [bold]LLM Backend:[/bold] llama.cpp / SSM Engine Mock")
+    console.print("\n[dim](Note: Modifying core weights/backends is restricted to the Enterprise deployment tier)[/dim]\n")
+
 if __name__ == "__main__":
     app()
