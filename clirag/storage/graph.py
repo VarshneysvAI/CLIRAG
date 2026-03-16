@@ -12,8 +12,10 @@ class GraphStorage:
     """
     
     def __init__(self, db_path: str = "data/kuzu/clirag_graph"):
-        os.makedirs(db_path, exist_ok=True)
         self.db_path = db_path
+        
+        # Pillar 4: Ensure directory exists before Kuzu initialization
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         
         # Initialize standard KuzuDB embedded file
         self.db = kuzu.Database(self.db_path)
@@ -28,9 +30,9 @@ class GraphStorage:
         if tables.empty or "Entity" not in tables['name'].values:
             logger.info("Initializing KùzuDB Graph Schema...")
             # Nodes
-            self.conn.execute("CREATE NODE TABLE Entity(name STRING, type STRING, PRIMARY KEY (name))")
+            self.conn.execute("CREATE NODE TABLE Entity(name STRING, type STRING, doc_id STRING, PRIMARY KEY (name))")
             # Edges
-            self.conn.execute("CREATE REL TABLE Relates(FROM Entity TO Entity, relation STRING)")
+            self.conn.execute("CREATE REL TABLE Relates(FROM Entity TO Entity, relation STRING, doc_id STRING)")
 
     def upsert_entities(self, entities: List[Dict[str, str]]):
         """
@@ -41,6 +43,12 @@ class GraphStorage:
         Example entity format:
         [{"head": "Company", "type": "ORGANIZATION", "tail": "AMD", "relation": "PARTNERSHIP"}]
         """
+        if not entities:
+            return
+            
+        # Get optional doc_id from first entity or pass as param
+        doc_id = entities[0].get("doc_id", "GLOBAL")
+        
         for item in entities:
             head_name = item.get('head')
             head_type = item.get('type', 'UNKNOWN')
@@ -54,26 +62,36 @@ class GraphStorage:
             try:
                 # Merge Head Node
                 self.conn.execute(
-                    "MERGE (h:Entity {name: $name}) ON CREATE SET h.type = $type",
-                    {"name": head_name, "type": head_type}
+                    "MERGE (h:Entity {name: $name}) ON CREATE SET h.type = $type, h.doc_id = $doc_id",
+                    {"name": head_name, "type": head_type, "doc_id": doc_id}
                 )
                 
-                # Merge Tail Node (assuming generic type if not specified for tail)
+                # Merge Tail Node
                 self.conn.execute(
-                    "MERGE (t:Entity {name: $name}) ON CREATE SET t.type = 'UNKNOWN'",
-                    {"name": tail_name}
+                    "MERGE (t:Entity {name: $name}) ON CREATE SET t.type = 'UNKNOWN', t.doc_id = $doc_id",
+                    {"name": tail_name, "doc_id": doc_id}
                 )
                 
                 # Merge Relationship
                 self.conn.execute(
                     """
                     MATCH (h:Entity {name: $head_name}), (t:Entity {name: $tail_name})
-                    MERGE (h)-[r:Relates {relation: $relation}]->(t)
+                    MERGE (h)-[r:Relates {relation: $relation, doc_id: $doc_id}]->(t)
                     """,
-                    {"head_name": head_name, "tail_name": tail_name, "relation": relation}
+                    {"head_name": head_name, "tail_name": tail_name, "relation": relation, "doc_id": doc_id}
                 )
             except Exception as e:
                 logger.error(f"Failed to upsert graph entity {head_name} -> {tail_name}: {e}")
+
+    def delete_document_data(self, doc_id: str):
+        """Removes all edges and potentially orphaned nodes for a doc."""
+        try:
+            # 1. Delete relations
+            self.conn.execute("MATCH ()-[r:Relates {doc_id: $doc_id}]->() DELETE r", {"doc_id": doc_id})
+            # 2. Delete nodes that were only in this doc (Simplified: delete nodes matching doc_id)
+            self.conn.execute("MATCH (n:Entity {doc_id: $doc_id}) DELETE n", {"doc_id": doc_id})
+        except Exception as e:
+            logger.error(f"Failed to delete graph data for {doc_id}: {e}")
 
     def close(self):
         self.conn.close()

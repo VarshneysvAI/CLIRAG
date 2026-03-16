@@ -21,9 +21,13 @@ setup(
         "kuzu>=0.0.11",
         "pymupdf>=1.23.0",
         "reportlab>=4.0.0", # Added for stress testing script
-        # "llama-cpp-python>=0.2.0",  # Requires C++ build tools, omit for standard mock installation
-        # "spacy",
-        # "gliner"
+        "llama-cpp-python>=0.2.0",
+        "huggingface-hub",
+        "sentence-transformers",
+        "gliner",
+        "fastapi",
+        "uvicorn",
+        "httpx"
     ],
     entry_points={
         "console_scripts": [

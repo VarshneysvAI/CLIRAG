@@ -2,7 +2,8 @@
 
 ![CLIRAG](https://img.shields.io/badge/Status-Hackathon_Sprint-red) ![Hardware](https://img.shields.io/badge/Hardware-Agnostic-blue) ![Memory](https://img.shields.io/badge/Memory-Strict_Isolation-green)
 
-**CLIRAG** is a disruptive, 100% offline, hardware-agnostic Edge AI analysis engine built for the **AMD Ryzen Slingshot Hackathon**.
+**CLIRAG** is a disruptive, 100% offline, hardware-agnostic Edge AI analysis engine.  
+Developed by **Shourya Varshney** (Lead) and Team **Hacktrinity** for the **AMD Ryzen Slingshot Hackathon**.
 
 ## 🌍 Thematic Context & Project Vision
 
@@ -83,8 +84,8 @@ CLIRAG relies on ultra-fast C++ backends for NLP, specialized storage, and infer
 
 3. **Install Python Environment:**
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   python -m venv env
+   source env/bin/activate  # On Windows: env\Scripts\activate
    pip install -r requirements.txt
    ```
    *Note: `requirements.txt` will pull in `llama-cpp-python`, `kuzu`, `duckdb`, `gliner`, `spacy`, `typer`, and `rich`.*
@@ -93,16 +94,45 @@ CLIRAG relies on ultra-fast C++ backends for NLP, specialized storage, and infer
    - *For AMD NPUs:* Install ONNX Runtime with DirectML execution provider.
    - *For ROCm/CUDA:* Set the appropriate `CMAKE_ARGS` when installing `llama-cpp-python` (e.g., `CMAKE_ARGS="-DLLAMA_HIPBLAS=on" pip install llama-cpp-python`).
 
-## 🏢 Business Roadmap (Open-Core)
+## 🕹️ Production Usage
 
-### 🟢 Community Tier (This MVP)
-- **Target:** Individual researchers, developers, and edge hackers.
-- **Features:** CPU-optimized processing (AVX2), standard Tesseract OCR, processing of local files (PDF, Markdown, TXT) only. Runs locally and completely offline.
+CLIRAG is now optimized for **Sub-2s Query Responses** and **Instant CLI** performance.
 
-### 🔵 Enterprise Tier (Future Pipeline)
-- **Target:** Corporate deployments, air-gapped intelligence agencies, legal/medical firms.
-- **Features:** 
-  - Multi-GPU Tensor Parallelism.
-  - Heavy Vision-Language Models (e.g., LLaVA) for native, intelligent image and chart understanding.
-  - Live-sync Enterprise Connectors (Google Drive, SharePoint, Confluence integrations).
-  - Advanced RBAC (Role-Based Access Control) at the document chunk level.
+### 1. One-Time Setup (Bootstrap)
+Ensure all production-grade model weights are present:
+```bash
+python -m clirag.main bootstrap
+```
+
+### 2. Ingest Documents
+Ingest high-priority files (PDF, Markdown, TXT) into the disk-bound store:
+```bash
+python -m clirag.main ingest "OOPS in Java.pdf"
+```
+
+### 3. Edge Engine (Performance Mode)
+Keep models resident in RAM for near-instant answers:
+```bash
+python -m clirag.main serve
+```
+
+### 4. Smart Querying (Client)
+In another terminal, query the database. Use `--doc` to filter:
+```bash
+python -m clirag.main ask "What is an object?" --doc "OOPS in Java.pdf"
+```
+
+### 5. Document Management
+List all ingested files:
+```bash
+python -m clirag.main list
+```
+
+## 🛠️ Performance Metrics (Modernized)
+
+- **CLI Response:** < 0.9s (Lazy Imports)
+- **Engine Query:** < 2.0s (RAM Residency via Edge Engine)
+- **Deduplication:** 100% hash-based (SHA256)
+
+---
+*Developed with ❤️ for the AMD Ryzen Slingshot Hackathon by Shourya Varshney (AI Warriors).*

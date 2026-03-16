@@ -4,12 +4,6 @@ import subprocess
 from enum import Enum
 from typing import Dict, Any
 
-# Configure logging for the hardware probe
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - [CLIRAG Probe] - %(levelname)s - %(message)s",
-    datefmt="%H:%M:%S",
-)
 logger = logging.getLogger("HardwareProbe")
 
 class HardwareBackend(Enum):

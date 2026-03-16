@@ -9,11 +9,12 @@ class VectorMetadataStorage:
     Satisfies Pillar 4: Disk-Bound Storage (SSD constrained)
     """
     
-    def __init__(self, db_path: str = "data/duckdb/clirag_meta.duckdb"):
+    def __init__(self, db_path: str = "data/duckdb/clirag_meta.duckdb", read_only: bool = False):
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.db_path = db_path
-        self.conn = duckdb.connect(self.db_path)
-        self._initialize_schema()
+        self.conn = duckdb.connect(self.db_path, read_only=read_only)
+        if not read_only:
+            self._initialize_schema()
 
     def _initialize_schema(self):
         """Creates the necessary tables if they do not exist."""
@@ -56,12 +57,22 @@ class VectorMetadataStorage:
         # Satisfies: Route 1 (BM25) FTS Index requirement
         self.conn.execute("INSTALL fts;")
         self.conn.execute("LOAD fts;")
-        # Create FTS index on chunk_id (key) and text_content (searchable text)
-        self.conn.execute("""
-            PRAGMA create_fts_index(
-                'Dense_Vectors', 'chunk_id', 'text_content', overwrite=1
-            );
-        """)
+        # Only create FTS index if it doesn't already exist.
+        # The index is properly refreshed after each ingestion via refresh_fts_index().
+        try:
+            self.conn.execute(
+                "SELECT * FROM fts_main_Dense_Vectors.match_bm25('__ping__', fields := 'text_content') LIMIT 0"
+            )
+        except Exception:
+            # Index does not exist yet — create it
+            try:
+                self.conn.execute("""
+                    PRAGMA create_fts_index(
+                        'Dense_Vectors', 'chunk_id', 'text_content', overwrite=1
+                    );
+                """)
+            except Exception:
+                pass  # Table may be empty on first run
 
 
     def compute_file_hash(self, filepath: str) -> str:
@@ -125,6 +136,31 @@ class VectorMetadataStorage:
                 'Dense_Vectors', 'chunk_id', 'text_content', overwrite=1
             );
         """)
+
+    def delete_document(self, doc_id: str):
+        """
+        Cascaded deletion of all document data.
+        """
+        # 1. Delete from sub-tables first
+        self.conn.execute("DELETE FROM ColBERT_Embeddings WHERE chunk_id IN (SELECT chunk_id FROM Dense_Vectors WHERE doc_id = ?)", [doc_id])
+        self.conn.execute("DELETE FROM Dense_Vectors WHERE doc_id = ?", [doc_id])
+        # 2. Delete meta
+        self.conn.execute("DELETE FROM Document_Metadata WHERE doc_id = ?", [doc_id])
+        # 3. Refresh FTS
+        self.refresh_fts_index()
+
+    def get_all_documents(self) -> List[Dict[str, Any]]:
+        """Returns a list of all ingested documents."""
+        res = self.conn.execute("SELECT doc_id, filename, ingested_at FROM Document_Metadata").fetchall()
+        return [{"doc_id": r[0], "filename": r[1], "ingested_at": r[2]} for r in res]
+
+    def get_doc_id_by_filename(self, filename: str) -> Optional[str]:
+        """Resolves a filename to its doc_id if it exists."""
+        res = self.conn.execute(
+            "SELECT doc_id FROM Document_Metadata WHERE filename = ? OR filename LIKE ?", 
+            [filename, f"%{filename}%"]
+        ).fetchone()
+        return res[0] if res else None
 
     def close(self):
         self.conn.close()
